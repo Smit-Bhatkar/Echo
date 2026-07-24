@@ -180,15 +180,16 @@ class CommandParser:
 
     def detect_intent(self, command, words):
 
-        # First, check if a known service exists
         service, info = self.find_service(command)
 
         if service:
             return info["intent"]
 
-        # Otherwise, check if it's an "open" command
         if any(word in self.OPEN_WORDS for word in words):
             return "open"
+
+        if any(word in self.SEARCH_WORDS for word in words):
+            return "search"
 
         return "chat"
 

@@ -1,21 +1,29 @@
-class SessionState:
+class SessionManager:
     def __init__(self):
-        self.last_service = None
-        self.last_intent = None
+        self.reset()
 
-    def update(self, parsed):
-        """
-        Store the last successful command.
-        """
+    def reset(self):
+        self.active_service = None
+        self.last_skill = None
+        self.last_query = None
 
-        if parsed.get("intent") == "open":
-            self.last_service = parsed.get("target")
+    def set_service(self, service):
+        self.active_service = service
 
-        elif parsed.get("intent") in ("youtube", "google"):
-            self.last_service = parsed.get("intent")
+    def get_service(self):
+        return self.active_service
 
-        self.last_intent = parsed.get("intent")
+    def set_skill(self, skill):
+        self.last_skill = skill
 
-    def clear(self):
-        self.last_service = None
-        self.last_intent = None
+    def get_skill(self):
+        return self.last_skill
+
+    def set_query(self, query):
+        self.last_query = query
+
+    def get_query(self):
+        return self.last_query
+
+
+session = SessionManager()
