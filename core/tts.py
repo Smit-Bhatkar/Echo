@@ -17,26 +17,34 @@ class PiperTTS:
 
     def speak(self, text):
 
-     temp_file = tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=".wav"
-     )
+        text = text.encode("ascii", errors="ignore").decode("ascii")
 
-     temp_file.close()
+        if not text.strip():
+            return
 
-     subprocess.run(
-         [
-             self.piper_path,
-             "-m",
-             self.model_path,
-             "-f",
-             temp_file.name,
-         ],
-         input=text,
-         text=True,
-         check=True,
-     )
+        temp_file = tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".wav"
+        )
 
-     playsound(temp_file.name)
+        temp_file.close()
 
-     os.remove(temp_file.name)
+        try:
+            subprocess.run(
+                [
+                 self.piper_path,
+                    "-m",
+                    self.model_path,
+                    "-f",
+                    temp_file.name,
+                ],
+                input=text,
+                text=True,
+                check=True,
+            )
+
+            playsound(temp_file.name)
+
+        finally:
+            if os.path.exists(temp_file.name):
+                os.remove(temp_file.name)

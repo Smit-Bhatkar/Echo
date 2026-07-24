@@ -13,26 +13,42 @@ print("=" * 40)
 
 while True:
 
-    input("\nPress ENTER to talk...")
+    try:
+        print("\n🎤 Listening...")
 
-    user = voice.listen()
+        user = voice.listen()
 
-    if not user:
-        continue
+        if not user:
+            continue
 
-    if user.lower() in ["exit", "quit"]:
+        if user.lower() in ["exit", "quit"]:
+            voice.speak("Goodbye.")
+            break
+
+        parsed = parser.parse(user)
+
+        print(f"[PARSER] {parsed}")
+
+        result = execute(parsed)
+
+        if result:
+            voice.speak(result)
+            continue
+
+        reply = brain.ask(user)
+        voice.speak(reply)
+
+    except KeyboardInterrupt:
+        print("\nShutting down Echo...")
         voice.speak("Goodbye.")
         break
 
-    parsed = parser.parse(user)
+    except Exception as e:
+        print(f"\n[ERROR] {type(e).__name__}: {e}")
 
-    print(f"[PARSER] {parsed}")
+        try:
+            voice.speak("Sorry, something went wrong.")
+        except Exception:
+            pass
 
-    result = execute(parsed)
-
-    if result:
-       voice.speak(result)
-       continue
-
-    reply = brain.ask(user)
-    voice.speak(reply)
+        continue

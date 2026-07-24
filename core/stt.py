@@ -1,6 +1,6 @@
 import os
 import tempfile
-
+import config
 import sounddevice as sd
 from scipy.io.wavfile import write
 from faster_whisper import WhisperModel
@@ -21,37 +21,50 @@ class STT:
         print("Loading Whisper model...")
 
         self.model = WhisperModel(
-            "base.en",
-            device="cpu",
-            compute_type="int8"
+             config.WHISPER_MODEL,
+             device=config.WHISPER_DEVICE,
+             compute_type=config.WHISPER_COMPUTE_TYPE
         )
 
-        self.samplerate = 16000
-        self.channels = 1
+        self.samplerate = config.SAMPLERATE
+        self.channels = config.CHANNELS
+        self.chunk_size = config.CHUNK_SIZE
+
+
         # ---------- Silero VAD ----------
 
-        self.chunk_size = 512
+        
 
         self.vad_model = load_silero_vad()
 
         self.vad_iterator = VADIterator(
              self.vad_model,
-             sampling_rate=self.samplerate
+             sampling_rate=self.samplerate,
+             threshold=config.VAD_THRESHOLD,
+             min_silence_duration_ms=config.MIN_SILENCE_MS,
+             speech_pad_ms=config.SPEECH_PAD_MS
         )
 
         print("Whisper loaded successfully.")
 
     def _record_audio(self):
-        """Record audio using a streaming microphone."""
+        """Record audio until Silero detects speech has ended."""
 
         print("🎤 Listening...")
 
+        # Reset VAD state for a fresh recording
+        self.vad_iterator.reset_states()
+
         audio_queue = queue.Queue()
-        chunks = []
+        recorded_chunks = []
+
+        recording_started = False
+
+        LISTEN_TIMEOUT = config.LISTEN_TIMEOUT
 
         def callback(indata, frames, time_info, status):
             if status:
-                print(status)
+               print(status)
 
             audio_queue.put(indata.copy())
 
@@ -63,13 +76,45 @@ class STT:
              callback=callback,
         ):
 
-             start = time.time()
+             start_time = time.time()
 
-             while time.time() - start < 5:
+             while True:
+
+                   # No speech for too long
+                   if not recording_started and time.time() - start_time > LISTEN_TIMEOUT:
+                      print("❌ No speech detected.")
+                      return np.zeros((1, 1), dtype=np.int16)
+
                    chunk = audio_queue.get()
-                   chunks.append(chunk)
 
-        recording = np.concatenate(chunks, axis=0)
+                   # Save original chunk
+                   audio_chunk = chunk.copy()
+ 
+                   # Prepare for Silero
+                   vad_chunk = torch.from_numpy(chunk.squeeze())
+
+                   event = self.vad_iterator(vad_chunk)
+
+                   # Speech started
+                   if event and "start" in event:
+                     print("🟢 Speech detected")
+                     recording_started = True
+
+                   # Save only after speech starts
+                   if recording_started:
+                     recorded_chunks.append(audio_chunk)
+
+                   # Speech ended
+                   if event and "end" in event:
+                      print("🔴 Speech ended")
+                      break
+
+        if not recorded_chunks:
+           return np.zeros((1, 1), dtype=np.int16)
+
+        recording = np.concatenate(recorded_chunks, axis=0)
+
+        recording = (recording * 32767).astype(np.int16)
 
         return recording
 
@@ -96,8 +141,8 @@ class STT:
 
         segments, info = self.model.transcribe(
             audio_path,
-            beam_size=5,
-            language="en"
+            beam_size=config.BEAM_SIZE,
+            language=config.LANGUAGE
         )
 
         text = ""
