@@ -4,6 +4,15 @@ import tempfile
 import sounddevice as sd
 from scipy.io.wavfile import write
 from faster_whisper import WhisperModel
+import torch
+import queue
+import time
+import numpy as np
+
+from silero_vad import (
+    load_silero_vad,
+    VADIterator
+)
 
 
 class STT:
@@ -19,22 +28,48 @@ class STT:
 
         self.samplerate = 16000
         self.channels = 1
+        # ---------- Silero VAD ----------
+
+        self.chunk_size = 512
+
+        self.vad_model = load_silero_vad()
+
+        self.vad_iterator = VADIterator(
+             self.vad_model,
+             sampling_rate=self.samplerate
+        )
 
         print("Whisper loaded successfully.")
 
-    def _record_audio(self, duration=5):
-        """Record audio from the microphone."""
+    def _record_audio(self):
+        """Record audio using a streaming microphone."""
 
         print("🎤 Listening...")
 
-        recording = sd.rec(
-            int(duration * self.samplerate),
-            samplerate=self.samplerate,
-            channels=self.channels,
-            dtype="int16"
-        )
+        audio_queue = queue.Queue()
+        chunks = []
 
-        sd.wait()
+        def callback(indata, frames, time_info, status):
+            if status:
+                print(status)
+
+            audio_queue.put(indata.copy())
+
+        with sd.InputStream(
+             samplerate=self.samplerate,
+             channels=self.channels,
+             dtype="float32",
+             blocksize=self.chunk_size,
+             callback=callback,
+        ):
+
+             start = time.time()
+
+             while time.time() - start < 5:
+                   chunk = audio_queue.get()
+                   chunks.append(chunk)
+
+        recording = np.concatenate(chunks, axis=0)
 
         return recording
 
