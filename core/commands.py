@@ -28,10 +28,10 @@ def execute(parsed):
         elif target == "calculator":
             return apps.open_calculator()
 
-        elif target == "command prompt":
+        elif target == "cmd":
             return apps.open_cmd()
 
-        elif target == "file explorer":
+        elif target == "explorer":
             return apps.open_explorer()
 
         result = browser.open_website(target)

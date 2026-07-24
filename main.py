@@ -2,10 +2,12 @@ from core.brain import Brain
 from core.commands import execute
 from core.voice import Voice
 from core.parser import CommandParser
+from core.session import SessionState
 
 brain = Brain()
 voice = Voice()
 parser = CommandParser()
+session = SessionState()
 
 print("=" * 40)
 print("      ECHO AI ASSISTANT")
